@@ -95,6 +95,18 @@ def create_db():
     conn.close()
 
 
+def clear_data():
+    """Delete all properties, price history, sessions, and analyses.
+    Called before each new run so only fresh API data is used."""
+    conn = _connect()
+    conn.execute("DELETE FROM price_history")
+    conn.execute("DELETE FROM analyses")
+    conn.execute("DELETE FROM properties")
+    conn.execute("DELETE FROM scrape_sessions")
+    conn.commit()
+    conn.close()
+
+
 # ─── Scrape Sessions ──────────────────────────────────────────────────────────
 
 def create_session(source: str, mode: str) -> int:

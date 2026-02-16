@@ -272,7 +272,7 @@ def _build_report(properties: list, all_metrics: list) -> str:
     # ── Footer ─────────────────────────────────────────────────
     lines.append("")
     lines.append("=" * W)
-    lines.append("  Disclaimer: Estimates only. Consult a licensed advisor.")
+    lines.append("  Built By Mithun Miras")
     lines.append("=" * W)
 
     return "\n".join(lines)

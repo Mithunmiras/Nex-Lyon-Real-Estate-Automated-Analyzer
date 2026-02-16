@@ -1,6 +1,6 @@
 """
 Nex-Lyon Real Estate Analyzer - Configuration
-Settings, Lyon market reference data, and demo fixtures.
+Settings and Lyon market reference data.
 """
 
 import os
@@ -48,108 +48,4 @@ DPE = {
     "G": {"label": "Critical",   "value_factor": 0.70, "energy_cost_yr": 3000, "reno_cost_m2": 900},
 }
 
-# ─── Demo Data ─────────────────────────────────────────────────────────────────
-# Curated realistic listings across all 9 arrondissements.
-# Used when no SerpAPI key is configured (fully functional without any API keys).
-DEMO_LISTINGS = [
-    {
-        "title": "T3 Lumineux - Pentes Croix-Rousse",
-        "price": 225000, "arrondissement": "Lyon 4e", "size": 68, "dpe": "F", "rooms": 3,
-        "description": "Bel appartement T3 traversant, parquet ancien, a renover. Vue degagee sur la ville.",
-    },
-    {
-        "title": "T2 Renove Standing - Bellecour",
-        "price": 295000, "arrondissement": "Lyon 2e", "size": 55, "dpe": "C", "rooms": 2,
-        "description": "Appartement entierement renove, cuisine equipee, proche place Bellecour.",
-    },
-    {
-        "title": "Studio Charme - Terreaux",
-        "price": 165000, "arrondissement": "Lyon 1er", "size": 28, "dpe": "D", "rooms": 1,
-        "description": "Studio plein de charme au coeur du 1er, ideal investissement locatif.",
-    },
-    {
-        "title": "T4 Familial - Monplaisir",
-        "price": 255000, "arrondissement": "Lyon 8e", "size": 88, "dpe": "E", "rooms": 4,
-        "description": "Grand T4 familial, 3 chambres, balcon, cave. Quartier calme et commercant.",
-    },
-    {
-        "title": "T3 Vue Parc Tete d'Or",
-        "price": 435000, "arrondissement": "Lyon 6e", "size": 75, "dpe": "B", "rooms": 3,
-        "description": "Superbe T3 avec vue sur le Parc de la Tete d'Or. Prestations haut de gamme.",
-    },
-    {
-        "title": "T2 Investisseur - Gerland",
-        "price": 178000, "arrondissement": "Lyon 7e", "size": 42, "dpe": "D", "rooms": 2,
-        "description": "T2 ideal investissement, proche metro et universites. Rentabilite assuree.",
-    },
-    {
-        "title": "T5 Bourgeois - Brotteaux",
-        "price": 620000, "arrondissement": "Lyon 6e", "size": 120, "dpe": "C", "rooms": 5,
-        "description": "Magnifique appartement bourgeois, moulures, cheminees, parquet point de Hongrie.",
-    },
-    {
-        "title": "T3 Neuf - Confluence",
-        "price": 345000, "arrondissement": "Lyon 2e", "size": 65, "dpe": "A", "rooms": 3,
-        "description": "Appartement neuf dans residence recente, terrasse, parking inclus.",
-    },
-    {
-        "title": "T2 Atypique - Vieux Lyon",
-        "price": 210000, "arrondissement": "Lyon 5e", "size": 48, "dpe": "E", "rooms": 2,
-        "description": "T2 de caractere dans immeuble Renaissance. Poutres apparentes, pierres dorees.",
-    },
-    {
-        "title": "T4 Renove - Part-Dieu",
-        "price": 310000, "arrondissement": "Lyon 3e", "size": 82, "dpe": "C", "rooms": 4,
-        "description": "T4 entierement renove, double sejour, a 5 min de la gare Part-Dieu.",
-    },
-    {
-        "title": "Studio Etudiant - Guillotiere",
-        "price": 98000, "arrondissement": "Lyon 7e", "size": 20, "dpe": "F", "rooms": 1,
-        "description": "Studio meuble, loue 450 EUR/mois. Proche universites Lyon 2 et Lyon 3.",
-    },
-    {
-        "title": "T3 Dernier Etage - Sans Souci",
-        "price": 275000, "arrondissement": "Lyon 3e", "size": 63, "dpe": "D", "rooms": 3,
-        "description": "T3 dernier etage avec terrasse, lumineux, ascenseur, gardien.",
-    },
-    {
-        "title": "T2 Cosy - Croix-Rousse Plateau",
-        "price": 245000, "arrondissement": "Lyon 4e", "size": 45, "dpe": "C", "rooms": 2,
-        "description": "Charmant T2 sur le plateau, ambiance village. Commerces et marche a pied.",
-    },
-    {
-        "title": "T4 A Renover - Duchere",
-        "price": 145000, "arrondissement": "Lyon 9e", "size": 78, "dpe": "G", "rooms": 4,
-        "description": "T4 a renover entierement. Prix attractif, fort potentiel de plus-value.",
-    },
-    {
-        "title": "T3 Moderne - Jean Mace",
-        "price": 268000, "arrondissement": "Lyon 7e", "size": 60, "dpe": "B", "rooms": 3,
-        "description": "T3 recent, lumineux, balcon, parking. Quartier dynamique en pleine evolution.",
-    },
-    {
-        "title": "T2 Meuble - Ainay",
-        "price": 275000, "arrondissement": "Lyon 2e", "size": 40, "dpe": "D", "rooms": 2,
-        "description": "T2 meuble dans quartier prise. Parfait pied-a-terre ou investissement.",
-    },
-    {
-        "title": "T5 Maison de Ville - Saint-Rambert",
-        "price": 380000, "arrondissement": "Lyon 9e", "size": 130, "dpe": "E", "rooms": 5,
-        "description": "Maison de ville avec jardin, 4 chambres, garage. Cadre verdoyant et calme.",
-    },
-    {
-        "title": "T3 Balcon Filant - Montchat",
-        "price": 285000, "arrondissement": "Lyon 3e", "size": 70, "dpe": "C", "rooms": 3,
-        "description": "T3 avec grand balcon filant, sejour lumineux, parquet chene. Quartier recherche.",
-    },
-    {
-        "title": "T2 Neuf BBC - Gerland",
-        "price": 215000, "arrondissement": "Lyon 7e", "size": 44, "dpe": "A", "rooms": 2,
-        "description": "T2 neuf basse consommation, terrasse, parking. Eco-quartier en developpement.",
-    },
-    {
-        "title": "T3 Haussmannien - Massena",
-        "price": 395000, "arrondissement": "Lyon 6e", "size": 72, "dpe": "D", "rooms": 3,
-        "description": "Bel Haussmannien, hauteur sous plafond, parquet, cheminee marbre.",
-    },
-]
+

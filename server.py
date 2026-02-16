@@ -14,7 +14,7 @@ if hasattr(sys.stdout, "reconfigure"):
 
 from flask import Flask, jsonify, send_file, send_from_directory
 from config import GOOGLE_SHEET_ID, LYON_MARKET
-from database import create_db, get_all_properties
+from database import create_db, clear_data, get_all_properties
 from scraper import scrape
 from analyzer import analyze
 from sheets import sync_to_sheets
@@ -43,6 +43,7 @@ def _run_pipeline():
         # Step 1
         state.update({"status": "running", "step": 1, "step_label": "Setting up database..."})
         create_db()
+        clear_data()  # Wipe old data so each run is fresh API-only
 
         # Step 2
         state.update({"step": 2, "step_label": "Scraping property data..."})
@@ -165,6 +166,47 @@ def api_download():
             download_name=os.path.basename(fname),
         )
     return jsonify({"error": "No report available"}), 404
+
+
+@app.route("/api/report/pdf")
+def api_download_pdf():
+    """Generate and download the report as a PDF."""
+    fname = result_cache.get("report_file", "")
+    if not fname or not os.path.exists(fname):
+        return jsonify({"error": "No report available"}), 404
+
+    try:
+        from fpdf import FPDF
+
+        with open(fname, "r", encoding="utf-8") as f:
+            report_text = f.read()
+
+        pdf = FPDF()
+        pdf.set_auto_page_break(auto=True, margin=15)
+        pdf.add_page()
+
+        # Title
+        pdf.set_font("Helvetica", "B", 16)
+        pdf.cell(0, 12, "Nex-Lyon Real Estate Investment Report", ln=True, align="C")
+        pdf.ln(4)
+
+        # Body - monospace for the formatted report
+        pdf.set_font("Courier", "", 8)
+        for line in report_text.split("\n"):
+            # Replace chars not in latin-1
+            safe_line = line.encode("latin-1", errors="replace").decode("latin-1")
+            pdf.cell(0, 4, safe_line, ln=True)
+
+        pdf_path = fname.replace(".txt", ".pdf")
+        pdf.output(pdf_path)
+
+        return send_file(
+            os.path.abspath(pdf_path),
+            as_attachment=True,
+            download_name=os.path.basename(pdf_path),
+        )
+    except Exception as e:
+        return jsonify({"error": f"PDF generation failed: {e}"}), 500
 
 
 @app.route("/api/reset", methods=["POST"])

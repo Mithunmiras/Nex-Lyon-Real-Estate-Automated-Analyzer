@@ -56,37 +56,79 @@ def _get_client() -> gspread.Client:
     )
 
 
-def _ensure_worksheet(spreadsheet: gspread.Spreadsheet, title: str, headers: list[str]) -> gspread.Worksheet:
-    """Get or create a worksheet with the given headers."""
-    try:
-        ws = spreadsheet.worksheet(title)
-    except gspread.WorksheetNotFound:
-        ws = spreadsheet.add_worksheet(title=title, rows=500, cols=len(headers))
-
-    # Always update headers (row 1)
-    ws.update([headers], "A1")
-
-    # Bold + freeze header row
-    ws.format("A1:Z1", {"textFormat": {"bold": True}})
-    ws.freeze(rows=1)
-
-    return ws
+def _col_letter(n: int) -> str:
+    """Convert 1-based column number to letter(s): 1->A, 26->Z, 27->AA."""
+    result = ""
+    while n > 0:
+        n, remainder = divmod(n - 1, 26)
+        result = chr(65 + remainder) + result
+    return result
 
 
-# ─── Sync Functions ────────────────────────────────────────────────────────────
+def _build_single_sheet(
+    spreadsheet: gspread.Spreadsheet,
+    properties: list[dict],
+    all_metrics: list[dict] | None,
+) -> tuple[gspread.Worksheet, int]:
+    """
+    Create a NEW worksheet named with the current timestamp.
+    Write all data (Properties + Analysis + Run Info) into one sheet.
+    Returns (worksheet, property_count).
+    """
+    now = datetime.datetime.now()
+    tab_title = f"Run {now.strftime('%Y-%m-%d %H:%M')}"
 
-def sync_properties(spreadsheet: gspread.Spreadsheet, properties: list[dict]):
-    """Write all properties to the 'Properties' sheet."""
-    headers = [
+    # Estimate rows needed
+    prop_count = len(properties)
+    analysis_count = len(all_metrics) if all_metrics else 0
+    total_rows = prop_count + analysis_count + 20  # extra for headers/spacing
+    total_cols = 17  # max columns across all sections
+
+    ws = spreadsheet.add_worksheet(title=tab_title, rows=max(total_rows, 50), cols=total_cols)
+
+    all_rows = []  # collect everything, write in one batch
+    bold_rows = []  # track which rows to bold (0-indexed)
+    current_row = 1
+
+    # ── Section 1: Run Info ────────────────────────────────────────────────
+    sessions = get_session_count()
+    first = get_first_session_date()
+    first_str = first[:10] if first else now.strftime("%Y-%m-%d")
+
+    all_rows.append(["RUN INFORMATION", "", "", ""])
+    bold_rows.append(current_row)
+    current_row += 1
+
+    all_rows.append(["Run Date", "Total Properties", "Sessions", "Tracking Since"])
+    bold_rows.append(current_row)
+    current_row += 1
+
+    all_rows.append([now.strftime("%Y-%m-%d %H:%M"), prop_count, sessions, first_str])
+    current_row += 1
+
+    # Blank separator row
+    all_rows.append([""])
+    current_row += 1
+
+    # ── Section 2: Properties ──────────────────────────────────────────────
+    prop_headers = [
+        "PROPERTIES", "", "", "", "", "", "", "", "", "", "", "", "",
+    ]
+    all_rows.append(prop_headers)
+    bold_rows.append(current_row)
+    current_row += 1
+
+    prop_col_headers = [
         "ID", "Title", "Price (EUR)", "Arrondissement", "Size (m²)",
         "Rooms", "DPE", "Price/m² (EUR)", "Description", "URL",
         "First Seen", "Last Seen", "Active",
     ]
-    ws = _ensure_worksheet(spreadsheet, "Properties", headers)
+    all_rows.append(prop_col_headers)
+    bold_rows.append(current_row)
+    current_row += 1
 
-    rows = []
     for p in properties:
-        rows.append([
+        all_rows.append([
             p.get("id", ""),
             p.get("title", ""),
             p.get("price", 0),
@@ -101,83 +143,75 @@ def sync_properties(spreadsheet: gspread.Spreadsheet, properties: list[dict]):
             (p.get("last_seen") or "")[:19],
             "Yes" if p.get("is_active") else "No",
         ])
+        current_row += 1
 
-    if rows:
-        # Clear old data (keep header), then write
-        ws.batch_clear([f"A2:M{ws.row_count}"])
-        ws.update(rows, f"A2:M{1 + len(rows)}")
+    # Blank separator row
+    all_rows.append([""])
+    current_row += 1
 
-    return len(rows)
+    # ── Section 3: Analysis ────────────────────────────────────────────────
+    if all_metrics and properties:
+        all_rows.append(["INVESTMENT ANALYSIS", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""])
+        bold_rows.append(current_row)
+        current_row += 1
 
+        analysis_headers = [
+            "ID", "Title", "Arrondissement", "Score", "Verdict",
+            "Price (EUR)", "Price/m²", "Market Avg/m²", "vs Market %",
+            "Monthly Rent", "Yield %", "5yr ROI %",
+            "Reno Cost", "Post-Reno Value", "Capital Gain",
+            "DPE", "Undervalued?",
+        ]
+        all_rows.append(analysis_headers)
+        bold_rows.append(current_row)
+        current_row += 1
 
-def sync_analyses(spreadsheet: gspread.Spreadsheet, properties: list[dict], all_metrics: list[dict]):
-    """Write the analysis results to the 'Analysis' sheet."""
-    headers = [
-        "ID", "Title", "Arrondissement", "Score", "Verdict",
-        "Price (EUR)", "Price/m²", "Market Avg/m²", "vs Market %",
-        "Monthly Rent", "Yield %", "5yr ROI %",
-        "Reno Cost", "Post-Reno Value", "Capital Gain",
-        "DPE", "Undervalued?",
-    ]
-    ws = _ensure_worksheet(spreadsheet, "Analysis", headers)
+        ranked = sorted(
+            zip(properties, all_metrics), key=lambda x: x[1]["score"], reverse=True
+        )
 
-    # Sort by score descending
-    ranked = sorted(
-        zip(properties, all_metrics), key=lambda x: x[1]["score"], reverse=True
-    )
+        for p, m in ranked:
+            score = m["score"]
+            if score >= 7:
+                verdict = "BUY"
+            elif score >= 5:
+                verdict = "HOLD"
+            else:
+                verdict = "AVOID"
 
-    rows = []
-    for p, m in ranked:
-        score = m["score"]
-        if score >= 7:
-            verdict = "BUY"
-        elif score >= 5:
-            verdict = "HOLD"
-        else:
-            verdict = "AVOID"
+            all_rows.append([
+                p.get("id", ""),
+                p.get("title", ""),
+                p.get("arrondissement", ""),
+                score,
+                verdict,
+                p.get("price", 0),
+                m["price_m2"],
+                m["market_avg_m2"],
+                m["price_vs_market_pct"],
+                m["monthly_rent"],
+                m["rental_yield_pct"],
+                m["roi_5yr"],
+                m["reno_cost"],
+                m["post_reno_value"],
+                m["capital_gain"],
+                p.get("dpe", ""),
+                "YES" if m["is_undervalued"] else "",
+            ])
+            current_row += 1
 
-        rows.append([
-            p.get("id", ""),
-            p.get("title", ""),
-            p.get("arrondissement", ""),
-            score,
-            verdict,
-            p.get("price", 0),
-            m["price_m2"],
-            m["market_avg_m2"],
-            m["price_vs_market_pct"],
-            m["monthly_rent"],
-            m["rental_yield_pct"],
-            m["roi_5yr"],
-            m["reno_cost"],
-            m["post_reno_value"],
-            m["capital_gain"],
-            p.get("dpe", ""),
-            "YES" if m["is_undervalued"] else "",
-        ])
+    # ── Write everything in one batch ──────────────────────────────────────
+    end_col = _col_letter(total_cols)
+    ws.update(all_rows, f"A1:{end_col}{len(all_rows)}")
 
-    if rows:
-        ws.batch_clear([f"A2:Q{ws.row_count}"])
-        ws.update(rows, f"A2:Q{1 + len(rows)}")
+    # Bold section headers and column headers
+    for row_num in bold_rows:
+        ws.format(f"A{row_num}:{end_col}{row_num}", {"textFormat": {"bold": True}})
 
-    return len(rows)
+    # Freeze first row
+    ws.freeze(rows=1)
 
-
-def sync_history(spreadsheet: gspread.Spreadsheet):
-    """Write a run-history log to the 'History' sheet."""
-    headers = ["Run Date", "Total Properties", "Sessions", "Tracking Since"]
-    ws = _ensure_worksheet(spreadsheet, "History", headers)
-
-    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-    sessions = get_session_count()
-    first = get_first_session_date()
-    first_str = first[:10] if first else now[:10]
-    total = len(get_all_properties())
-
-    # Append a new row (don't overwrite previous runs)
-    existing = ws.get_all_values()
-    next_row = len(existing) + 1
-    ws.update([[now, total, sessions, first_str]], f"A{next_row}")
+    return ws, prop_count
 
 
 # ─── Main Entry Point ─────────────────────────────────────────────────────────
@@ -185,6 +219,8 @@ def sync_history(spreadsheet: gspread.Spreadsheet):
 def sync_to_sheets(properties: list[dict] = None, all_metrics: list[dict] = None) -> str:
     """
     Sync all data to Google Sheets.
+    Each run creates a NEW worksheet tab named with the timestamp.
+    All data (Properties + Analysis + Run Info) goes into that single tab.
     Returns a status message.
     """
     if not GOOGLE_SHEET_ID:
@@ -202,16 +238,11 @@ def sync_to_sheets(properties: list[dict] = None, all_metrics: list[dict] = None
         if properties is None:
             properties = get_all_properties()
 
-        prop_count = sync_properties(spreadsheet, properties)
-
-        if all_metrics:
-            sync_analyses(spreadsheet, properties, all_metrics)
-
-        sync_history(spreadsheet)
+        ws, prop_count = _build_single_sheet(spreadsheet, properties, all_metrics)
 
         sheet_url = f"https://docs.google.com/spreadsheets/d/{GOOGLE_SHEET_ID}"
         return (
-            f"  Synced {prop_count} properties to Google Sheets\n"
+            f"  Synced {prop_count} properties to Google Sheets (tab: {ws.title})\n"
             f"  Sheet: {sheet_url}"
         )
     except Exception as e:

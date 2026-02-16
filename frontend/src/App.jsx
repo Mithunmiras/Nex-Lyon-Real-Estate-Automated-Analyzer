@@ -454,7 +454,10 @@ export default function App() {
                 </a>
               )}
               <a href={`${API}/report/download`} className="btn btn-download">
-                📥 Report
+                📥 Report (TXT)
+              </a>
+              <a href={`${API}/report/pdf`} className="btn btn-download">
+                📄 Report (PDF)
               </a>
               <button onClick={reset} className="btn btn-outline">
                 🔄 New Run
@@ -472,7 +475,7 @@ export default function App() {
       </main>
 
       <footer className="footer">
-        Nex-Lyon Real Estate Analyzer &middot; Data for informational purposes only
+        Nex-Lyon Real Estate Analyzer &middot; Built By Mithun Miras
       </footer>
     </div>
   )

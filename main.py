@@ -7,7 +7,7 @@ Usage:  python main.py
 
 import sys
 import datetime
-from database import create_db
+from database import create_db, clear_data
 from scraper import scrape
 from analyzer import analyze
 from sheets import sync_to_sheets
@@ -32,6 +32,7 @@ def main():
     # Step 1 ─ Database
     print("[1/4] Setting up database...")
     create_db()
+    clear_data()  # Wipe old data so each run is fresh API-only
     print("  Database ready.\n")
 
     # Step 2 ─ Scrape

@@ -6,12 +6,13 @@ Strategy for bypassing anti-scraping mechanisms:
   handles CAPTCHAs, IP rotation, and rate-limiting behind the scenes.
   This is the industry-standard legal approach for web data collection.
 
-Falls back to curated demo data when no API key is available.
+Requires a valid SERPAPI_KEY in .env to function.
 """
 
 import re
+import random
 import requests
-from config import SERPAPI_KEY, DEMO_LISTINGS, LYON_MARKET
+from config import SERPAPI_KEY, LYON_MARKET
 from database import create_session, update_session_count, upsert_property
 
 
@@ -95,8 +96,8 @@ def _parse_dpe(text: str):
 
 def scrape_live() -> int:
     """
-    Query SerpAPI (Google Search) for SeLoger Lyon listings.
-    Parses price, size, arrondissement, DPE from result titles & snippets.
+    Query SerpAPI (Google Search) for Lyon property listings.
+    Uses randomized, varied queries each run to get different results.
     Returns number of NEW properties inserted.
     """
     if not SERPAPI_KEY:
@@ -105,11 +106,36 @@ def scrape_live() -> int:
     session_id = create_session("serpapi", "live")
     inserted = 0
 
-    queries = [
-        "site:seloger.com appartement achat Lyon",
-        "site:seloger.com vente appartement Lyon prix",
-        "appartement a vendre Lyon seloger",
+    # Build diverse queries — pick random arrondissements, price ranges, room types
+    arrondissements = ["Lyon 1er", "Lyon 2eme", "Lyon 3eme", "Lyon 4eme",
+                       "Lyon 5eme", "Lyon 6eme", "Lyon 7eme", "Lyon 8eme", "Lyon 9eme"]
+    room_types = ["T2", "T3", "T4", "studio", "T5"]
+    price_ranges = ["moins de 200000", "200000 300000", "300000 500000", "plus de 400000"]
+    sites = ["site:seloger.com", "site:leboncoin.fr", "site:bien-ici.fr",
+             "site:logic-immo.com", "site:pap.fr"]
+
+    # Always include a few broad queries
+    base_queries = [
+        f"{random.choice(sites)} appartement achat {random.choice(arrondissements)}",
+        f"{random.choice(sites)} vente appartement Lyon {random.choice(room_types)}",
+        f"appartement a vendre Lyon {random.choice(arrondissements)} prix",
     ]
+
+    # Add targeted queries with random parameters
+    extra_queries = [
+        f"{random.choice(sites)} {random.choice(room_types)} Lyon {random.choice(arrondissements)}",
+        f"achat appartement Lyon {random.choice(price_ranges)} euros",
+        f"{random.choice(sites)} appartement Lyon DPE {random.choice(['A','B','C','D','E'])}",
+        f"vente immobilier Lyon {random.choice(arrondissements)} {random.choice(room_types)} {random.choice(price_ranges)}",
+        f"appartement {random.choice(room_types)} a vendre {random.choice(arrondissements)} 2026",
+        f"{random.choice(sites)} Lyon appartement {random.randint(30,100)}m2",
+    ]
+
+    # Pick 5 queries total (3 base + 2 random extras) to stay within API limits
+    queries = base_queries + random.sample(extra_queries, min(2, len(extra_queries)))
+    random.shuffle(queries)
+
+    print(f"    Running {len(queries)} search queries...")
 
     for query in queries:
         try:
@@ -122,6 +148,7 @@ def scrape_live() -> int:
                     "num": 10,
                     "hl": "fr",
                     "gl": "fr",
+                    "no_cache": "true",
                 },
                 timeout=30,
             )
@@ -178,49 +205,14 @@ def scrape_live() -> int:
     return inserted
 
 
-# ─── Demo Mode ─────────────────────────────────────────────────────────────────
-
-def scrape_demo() -> int:
-    """Load curated demo listings into the database. Returns new property count."""
-    session_id = create_session("demo", "demo")
-    inserted = 0
-
-    for item in DEMO_LISTINGS:
-        prop = {
-            "title": item["title"],
-            "price": item["price"],
-            "arrondissement": item["arrondissement"],
-            "size": item["size"],
-            "rooms": item["rooms"],
-            "dpe": item["dpe"],
-            "description": item["description"],
-            "url": "",
-            "price_per_m2": item["price"] / item["size"],
-        }
-        _, is_new = upsert_property(prop, session_id)
-        if is_new:
-            inserted += 1
-            print(f"    + {item['title']}")
-
-    update_session_count(session_id, inserted)
-    return inserted
-
-
 # ─── Entry Point ───────────────────────────────────────────────────────────────
 
 def scrape() -> int:
-    """Try live scraping; fall back to demo data on failure or missing key."""
-    if SERPAPI_KEY:
-        print("  SerpAPI key detected - attempting live scrape...")
-        try:
-            count = scrape_live()
-            if count > 0:
-                return count
-            print("  No new results from live scrape, adding demo data...")
-        except Exception as e:
-            print(f"  Live scrape error: {e}")
-            print("  Falling back to demo data...")
-    else:
-        print("  No SerpAPI key - using demo data (set SERPAPI_KEY in .env for live)")
+    """Scrape live data via SerpAPI. Requires SERPAPI_KEY in .env."""
+    if not SERPAPI_KEY:
+        raise ValueError("SERPAPI_KEY is required in .env - no demo/synthetic data available")
 
-    return scrape_demo()
+    print("  SerpAPI key detected - scraping live data...")
+    count = scrape_live()
+    print(f"  Scrape complete: {count} new properties found")
+    return count
