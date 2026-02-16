@@ -21,7 +21,17 @@ Automated Python tool that **scrapes**, **stores**, and **analyzes** real estate
 
 ---
 
-## One-Click Setup
+## Live Demo
+
+**Try it now:** [https://nex-lyon-real-estate-automated-analyzer-1.onrender.com](https://nex-lyon-real-estate-automated-analyzer-1.onrender.com/)
+
+> **Note:** Run timestamps in the deployed version are in **UTC**. The first request may take ~30 seconds as Render spins up the free-tier instance.
+
+---
+
+## Manual Setup (Local)
+
+If you prefer to run it locally, follow the steps below.
 
 ### Prerequisites
 
