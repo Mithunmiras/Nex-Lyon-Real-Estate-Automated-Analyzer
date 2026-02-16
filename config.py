@@ -15,6 +15,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 # ─── Google Sheets ─────────────────────────────────────────────────────────────
 GOOGLE_SHEET_ID = os.getenv("GOOGLE_SHEET_ID", "")
 GOOGLE_CREDENTIALS_FILE = os.getenv("GOOGLE_CREDENTIALS_FILE", "credentials.json")
+GOOGLE_CREDENTIALS_JSON = os.getenv("GOOGLE_CREDENTIALS_JSON", "")  # base64 or raw JSON
 
 # ─── Database ──────────────────────────────────────────────────────────────────
 DB_NAME = "lyon_real_estate.db"

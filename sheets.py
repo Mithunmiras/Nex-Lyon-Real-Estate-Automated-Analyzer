@@ -12,10 +12,12 @@ Setup (one-time):
   6. Copy the Sheet ID from the URL and put it in .env as GOOGLE_SHEET_ID
 """
 
+import json
+import base64
 import datetime
 import gspread
 from google.oauth2.service_account import Credentials
-from config import GOOGLE_SHEET_ID, GOOGLE_CREDENTIALS_FILE
+from config import GOOGLE_SHEET_ID, GOOGLE_CREDENTIALS_FILE, GOOGLE_CREDENTIALS_JSON
 from database import get_all_properties, get_session_count, get_first_session_date
 
 
@@ -28,9 +30,30 @@ SCOPES = [
 
 
 def _get_client() -> gspread.Client:
-    """Authenticate with Google via service account credentials."""
-    creds = Credentials.from_service_account_file(GOOGLE_CREDENTIALS_FILE, scopes=SCOPES)
-    return gspread.authorize(creds)
+    """Authenticate with Google via service account credentials.
+    Supports: env var (base64 or raw JSON) or local file."""
+    import os
+
+    # Priority 1: GOOGLE_CREDENTIALS_JSON env var (for deployed environments)
+    if GOOGLE_CREDENTIALS_JSON:
+        try:
+            # Try base64 first
+            info = json.loads(base64.b64decode(GOOGLE_CREDENTIALS_JSON))
+        except Exception:
+            # Try raw JSON string
+            info = json.loads(GOOGLE_CREDENTIALS_JSON)
+        creds = Credentials.from_service_account_info(info, scopes=SCOPES)
+        return gspread.authorize(creds)
+
+    # Priority 2: credentials file (for local development)
+    if os.path.exists(GOOGLE_CREDENTIALS_FILE):
+        creds = Credentials.from_service_account_file(GOOGLE_CREDENTIALS_FILE, scopes=SCOPES)
+        return gspread.authorize(creds)
+
+    raise FileNotFoundError(
+        "No Google credentials found. Set GOOGLE_CREDENTIALS_JSON env var "
+        "or place credentials.json in the project folder."
+    )
 
 
 def _ensure_worksheet(spreadsheet: gspread.Spreadsheet, title: str, headers: list[str]) -> gspread.Worksheet:
@@ -166,12 +189,10 @@ def sync_to_sheets(properties: list[dict] = None, all_metrics: list[dict] = None
     """
     if not GOOGLE_SHEET_ID:
         return "  Skipped: No GOOGLE_SHEET_ID in .env"
-    if not GOOGLE_CREDENTIALS_FILE:
-        return "  Skipped: No GOOGLE_CREDENTIALS_FILE in .env"
 
     import os
-    if not os.path.exists(GOOGLE_CREDENTIALS_FILE):
-        return f"  Skipped: Credentials file not found at {GOOGLE_CREDENTIALS_FILE}"
+    if not GOOGLE_CREDENTIALS_JSON and not os.path.exists(GOOGLE_CREDENTIALS_FILE):
+        return "  Skipped: No credentials (set GOOGLE_CREDENTIALS_JSON env var or add credentials.json)"
 
     try:
         client = _get_client()
