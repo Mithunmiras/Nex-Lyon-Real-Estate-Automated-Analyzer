@@ -1,6 +1,8 @@
 # Nex-Lyon Real Estate Analyzer
 
-Automated Python tool that **scrapes**, **stores**, and **analyzes** real estate listings in Lyon, France.
+Automated Python tool that **scrapes**, **stores**, and **analyzes** real estate listings in Lyon, France — with a **React dashboard**, **PDF reports**, and **Google Sheets** sync.
+
+**Built By Mithun Miras**
 
 ---
 
@@ -8,84 +10,90 @@ Automated Python tool that **scrapes**, **stores**, and **analyzes** real estate
 
 | Feature | Details |
 |---------|---------|
-| **Automated Scraping** | SerpAPI (legitimate Google Search API) - bypasses anti-scraping via CAPTCHA solving, IP rotation, rate-limit handling |
-| **Database** | SQLite with historical price tracking across multiple runs |
-| **AI Analysis** | Google Gemini generates investment verdicts for top opportunities |
-| **Rule-Based Scoring** | Works fully offline with no API keys (demo mode) |
+| **Live Scraping** | SerpAPI (Google Search API) with randomized queries — fresh data every run |
+| **React Dashboard** | Interactive web UI with charts, scores, and undervalued property cards |
+| **PDF & TXT Reports** | Downloadable investment reports from the dashboard |
+| **Database** | SQLite with price tracking and session history |
+| **AI Analysis** | Google Gemini generates BUY/HOLD/AVOID verdicts for top opportunities |
+| **Rule-Based Scoring** | Investment score (1-10) based on price, yield, DPE, and ROI |
+| **Google Sheets Sync** | Each run creates a new tab with Properties + Analysis + Run Info |
 | **Undervalued Detection** | Flags properties below market price/m² with renovation upside |
 
 ---
 
-## One-Click Setup (SOP)
+## One-Click Setup
 
 ### Prerequisites
 
-- **Python 3.9+** installed ([python.org/downloads](https://www.python.org/downloads/))
+- **Python 3.9+** ([python.org/downloads](https://www.python.org/downloads/))
+- **Node.js 18+** ([nodejs.org](https://nodejs.org)) — for the React frontend
+- **SerpAPI Key** ([serpapi.com](https://serpapi.com)) — required for live data
 
 ### Steps
 
 ```bash
-# 1. Open a terminal in the project folder
+# 1. Clone the repo
+git clone https://github.com/Mithunmiras/Nex-Lyon-Real-Estate-Automated-Analyzer.git
+cd Nex-Lyon-Real-Estate-Automated-Analyzer
 
-# 2. Create virtual environment
+# 2. Create & activate virtual environment
 python -m venv .venv
-
-# 3. Activate it
-#    Windows:
+# Windows:
 .venv\Scripts\activate
-#    macOS / Linux:
+# macOS/Linux:
 source .venv/bin/activate
 
-# 4. Install dependencies
+# 3. Install Python dependencies
 pip install -r requirements.txt
 
-# 5. Run
+# 4. Build the React frontend
+cd frontend && npm install && npm run build && cd ..
+
+# 5. Set up environment variables
+cp .env.example .env
+# Edit .env and add your API keys (see below)
+
+# 6. Run the web dashboard
+python server.py
+# Open http://localhost:5000
+
+# OR run via CLI
 python main.py
 ```
 
-**That's it.** No API keys are required - the program runs in demo mode with 20 curated Lyon properties.
+### Required Environment Variables
 
-### Optional: Enable Live Data & AI
-
-Copy `.env.example` to `.env` and add your keys:
-
-```bash
-cp .env.example .env
-```
+Create a `.env` file with:
 
 | Key | Purpose | Where to get it |
 |-----|---------|-----------------|
-| `SERPAPI_KEY` | Live web scraping | [serpapi.com](https://serpapi.com) (free tier available) |
+| `SERPAPI_KEY` | **Required** — Live web scraping | [serpapi.com](https://serpapi.com) (free tier: 100 searches/mo) |
 | `GEMINI_API_KEY` | AI investment insights | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) (free) |
 | `GOOGLE_SHEET_ID` | Cloud data sync | See Google Sheets setup below |
 | `GOOGLE_CREDENTIALS_FILE` | Service account auth | See Google Sheets setup below |
 
-### Optional: Enable Google Sheets Sync
+### Optional: Google Sheets Sync
 
-Data is automatically synced to a Google Sheet (3 tabs: Properties, Analysis, History).
+Each run creates a **new tab** in your Google Sheet with all data (Properties, Analysis, Run Info) combined.
 
 **One-time setup (5 minutes):**
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com)
-2. Create a project (or select existing) → Enable **Google Sheets API** and **Google Drive API**
-3. Go to **IAM & Admin → Service Accounts** → Create a service account
-4. Click the service account → **Keys** tab → **Add Key → JSON** → download the file
-5. Rename it to `credentials.json` and place it in the project folder
-6. Create a new Google Sheet → copy the **Sheet ID** from the URL:
+2. Create a project → Enable **Google Sheets API** and **Google Drive API**
+3. **IAM & Admin → Service Accounts** → Create → **Keys → Add Key → JSON** → download
+4. Save as `credentials.json` in the project folder
+5. Create a Google Sheet → copy the **Sheet ID** from the URL:
    ```
    https://docs.google.com/spreadsheets/d/THIS_IS_THE_SHEET_ID/edit
    ```
-7. Share the Google Sheet with the **service account email** (found in `credentials.json` under `client_email`) as **Editor**
-8. Add to your `.env`:
+6. Share the Sheet with the **service account email** (from `credentials.json`) as **Editor**
+7. Add to `.env`:
    ```
    GOOGLE_SHEET_ID=your_sheet_id_here
    GOOGLE_CREDENTIALS_FILE=credentials.json
    ```
 
-The program creates 3 worksheets automatically:
-- **Properties** — all scraped listings with prices, sizes, DPE, timestamps
-- **Analysis** — scored & ranked investment analysis with ROI calculations
-- **History** — run log for tracking data growth over time
+For deployed environments (e.g., Render), set `GOOGLE_CREDENTIALS_JSON` as a base64-encoded env var instead of using the file.
 
 ---
 
@@ -94,54 +102,53 @@ The program creates 3 worksheets automatically:
 ### Architecture
 
 ```
-main.py          -> Orchestrator (run this)
-  |-- config.py    -> Settings, market data, demo fixtures
-  |-- database.py  -> SQLite with historical tracking
-  |-- scraper.py   -> SerpAPI live scraping + demo mode
-  |-- analyzer.py  -> Rule-based metrics + Gemini AI insights
-  |-- sheets.py    -> Google Sheets sync (Properties, Analysis, History)
+server.py          -> Flask web server + API (run this for dashboard)
+main.py            -> CLI entry point (alternative to server)
+  |-- config.py    -> Settings & Lyon market reference data
+  |-- database.py  -> SQLite with session tracking & clear-on-run
+  |-- scraper.py   -> SerpAPI live scraping (randomized queries, no cache)
+  |-- analyzer.py  -> Rule-based scoring + Gemini AI verdicts
+  |-- sheets.py    -> Google Sheets sync (new tab per run)
+frontend/          -> React + Vite + Recharts dashboard
 ```
 
 ### Pipeline
 
 ```
 [1/4] Database Setup
-  -> Creates/upgrades SQLite schema (properties, price_history, analyses, sessions)
+  -> Creates SQLite schema → clears old data for fresh run
 
-[2/4] Data Scraping
-  -> If SERPAPI_KEY: searches Google for SeLoger Lyon listings, parses price/size/DPE
-  -> If no key:     loads 20 curated demo properties across all 9 arrondissements
+[2/4] Live Data Scraping
+  -> Randomized SerpAPI queries across arrondissements, room types, price ranges
+  -> Searches SeLoger, LeBonCoin, BienIci, PAP, Logic-Immo via Google
+  -> Parses price, size, arrondissement, rooms, DPE from results
 
 [3/4] Investment Analysis
-  -> Rule-based: price vs market avg, rental yield, renovation ROI, DPE impact
-  -> AI (optional): Gemini generates BUY/HOLD/AVOID verdicts for top opportunities
-  -> Saves all results to DB + generates report file
+  -> Rule-based: price vs market, rental yield, renovation ROI, DPE impact
+  -> AI (optional): Gemini generates BUY/HOLD/AVOID for top opportunities
+  -> Generates downloadable report (TXT + PDF)
 
 [4/4] Google Sheets Sync
-  -> Exports properties, analysis rankings, and run history to Google Sheets
-  -> Skipped gracefully if no credentials configured
+  -> Creates a new tab with timestamp (e.g., "Run 2026-02-16 17:30")
+  -> Contains Run Info + Properties + Analysis in one sheet
+  -> Previous run tabs are preserved for history
 ```
 
 ### Anti-Scraping Strategy
 
-Instead of scraping websites directly (which triggers CAPTCHAs and IP bans), we use **SerpAPI** - a legitimate API service that:
+We use **SerpAPI** — a legitimate Google Search API that:
 
 - Solves CAPTCHAs automatically
 - Rotates IPs across data centers
 - Handles rate limiting and retries
 - Returns structured JSON from Google Search results
+- `no_cache: true` ensures fresh results each run
 
-This is the industry-standard legal approach to web data collection.
+Queries are **randomized** each run (different arrondissements, room types, price ranges, listing sites) to maximize data variety.
 
-### Historical Tracking
+### Data Freshness
 
-Each run creates a **scrape session**. When a property is seen again:
-
-- Its `last_seen` timestamp is updated
-- Price changes are recorded in `price_history`
-- Old and new analyses are preserved for trend comparison
-
-Run `python main.py` weekly to build a historical dataset.
+Each run **clears the database** and scrapes fresh data from the API. No stale or synthetic data is used. Previous results are preserved in Google Sheets tabs for historical comparison.
 
 ### Investment Scoring (1-10)
 
@@ -162,9 +169,11 @@ The score factors in:
 
 The program generates:
 
-1. **Console report** with market overview, rankings, and undervalued highlights
-2. **`report_YYYY-MM-DD.txt`** saved to the project folder
-3. **SQLite database** (`lyon_real_estate.db`) with all data for further analysis
+1. **React Dashboard** at `http://localhost:5000` with charts, scores, and property cards
+2. **PDF Report** downloadable from the dashboard
+3. **TXT Report** (`report_YYYY-MM-DD.txt`) saved to the project folder
+4. **Google Sheets** — new tab per run with all data combined
+5. **SQLite Database** (`lyon_real_estate.db`) for the current run
 
 ---
 
@@ -172,20 +181,36 @@ The program generates:
 
 ```
 nex_lyon_analyzer/
-|-- main.py              # Entry point
+|-- server.py            # Flask API + web server (run this)
+|-- main.py              # CLI entry point
 |-- config.py            # Configuration & market data
 |-- database.py          # Database operations
-|-- scraper.py           # Data collection
-|-- analyzer.py          # Investment analysis
+|-- scraper.py           # Live data collection (SerpAPI)
+|-- analyzer.py          # Investment analysis + scoring
 |-- sheets.py            # Google Sheets sync
 |-- requirements.txt     # Python dependencies
-|-- .env                 # Your API keys (gitignored)
+|-- .env                 # API keys
 |-- .env.example         # API key template
-|-- credentials.json     # Google service account key (gitignored)
-|-- README.md            # This file
+|-- credentials.json     # Google service account key
+|-- frontend/            # React + Vite dashboard
+|   |-- src/App.jsx      # Main dashboard component
+|   |-- dist/            # Built frontend (served by Flask)
 |-- lyon_real_estate.db  # Database (auto-created)
-|-- report_*.txt         # Generated reports
+|-- report_*.txt         # Generated text reports
+|-- report_*.pdf         # Generated PDF reports
 ```
+
+---
+
+## Deployment (Render)
+
+1. Push code to GitHub
+2. Create a new **Web Service** on [Render](https://render.com)
+3. Connect your GitHub repo
+4. Settings:
+   - **Build Command:** `pip install -r requirements.txt`
+   - **Start Command:** `gunicorn server:app -b 0.0.0.0:$PORT --timeout 120`
+5. Add environment variables: `SERPAPI_KEY`, `GEMINI_API_KEY`, `GOOGLE_SHEET_ID`, `GOOGLE_CREDENTIALS_JSON` (base64-encoded)
 
 ---
 
@@ -196,6 +221,8 @@ nex_lyon_analyzer/
 | `pip` not recognized | Use `python -m pip install -r requirements.txt` |
 | `python` not recognized | Try `python3`, or check Python is in your PATH |
 | ModuleNotFoundError | Activate the venv first: `.venv\Scripts\activate` |
-| Encoding error on Windows | Update to Windows Terminal; the code handles this automatically |
-| SerpAPI returns 0 results | Normal - it falls back to demo data. Check your API key quota |
+| Same data every run | Fixed — DB is cleared + queries are randomized + `no_cache` enabled |
+| SerpAPI returns 0 results | Check your API key and quota at [serpapi.com/manage-api-key](https://serpapi.com/manage-api-key) |
 | Gemini API error | AI insights are skipped gracefully; rule-based analysis still runs |
+| PDF download shows 404 | Run an analysis first — reports are generated during the pipeline |
+| Google Sheets not syncing | Check `GOOGLE_SHEET_ID` and credentials in `.env` |
