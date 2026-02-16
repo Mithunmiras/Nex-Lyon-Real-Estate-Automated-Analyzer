@@ -36,6 +36,7 @@ def _get_client() -> gspread.Client:
 
     # Priority 1: GOOGLE_CREDENTIALS_JSON env var (for deployed environments)
     if GOOGLE_CREDENTIALS_JSON:
+        print("  [Sheets] Using GOOGLE_CREDENTIALS_JSON env var")
         try:
             # Try base64 first
             info = json.loads(base64.b64decode(GOOGLE_CREDENTIALS_JSON))
@@ -45,11 +46,25 @@ def _get_client() -> gspread.Client:
         creds = Credentials.from_service_account_info(info, scopes=SCOPES)
         return gspread.authorize(creds)
 
-    # Priority 2: credentials file (for local development)
-    if os.path.exists(GOOGLE_CREDENTIALS_FILE):
-        creds = Credentials.from_service_account_file(GOOGLE_CREDENTIALS_FILE, scopes=SCOPES)
-        return gspread.authorize(creds)
+    # Priority 2: credentials file - check multiple locations
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    paths_to_try = [
+        GOOGLE_CREDENTIALS_FILE,                              # as configured
+        os.path.join(script_dir, GOOGLE_CREDENTIALS_FILE),    # relative to project
+        os.path.join(script_dir, "credentials.json"),         # hardcoded fallback
+    ]
 
+    for cred_path in paths_to_try:
+        if os.path.exists(cred_path):
+            print(f"  [Sheets] Using credentials file: {cred_path}")
+            creds = Credentials.from_service_account_file(cred_path, scopes=SCOPES)
+            return gspread.authorize(creds)
+
+    print(f"  [Sheets] ERROR: No credentials found.")
+    print(f"  [Sheets]   GOOGLE_CREDENTIALS_JSON env var: {'SET' if GOOGLE_CREDENTIALS_JSON else 'NOT SET'}")
+    print(f"  [Sheets]   Checked file paths: {paths_to_try}")
+    print(f"  [Sheets]   Working dir: {os.getcwd()}")
+    print(f"  [Sheets]   Script dir: {script_dir}")
     raise FileNotFoundError(
         "No Google credentials found. Set GOOGLE_CREDENTIALS_JSON env var "
         "or place credentials.json in the project folder."
@@ -227,7 +242,13 @@ def sync_to_sheets(properties: list[dict] = None, all_metrics: list[dict] = None
         return "  Skipped: No GOOGLE_SHEET_ID in .env"
 
     import os
-    if not GOOGLE_CREDENTIALS_JSON and not os.path.exists(GOOGLE_CREDENTIALS_FILE):
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    has_creds = (
+        GOOGLE_CREDENTIALS_JSON
+        or os.path.exists(GOOGLE_CREDENTIALS_FILE)
+        or os.path.exists(os.path.join(script_dir, "credentials.json"))
+    )
+    if not has_creds:
         return "  Skipped: No credentials (set GOOGLE_CREDENTIALS_JSON env var or add credentials.json)"
 
     try:
